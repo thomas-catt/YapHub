@@ -1,9 +1,7 @@
 import motor.motor_asyncio
 import os
 
-# Usually you would load this from your .env file
-# e.g., MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-MONGO_URI = "mongodb://localhost:27017"
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 
 # Create the async MongoDB client
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
