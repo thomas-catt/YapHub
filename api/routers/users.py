@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Response, status
 from models.schemas.users import UserCreate, UserLogin
-from database import users_collection
+from models.user import User
 from utils.auth import get_password_hash, verify_password, create_access_token
 from bson import ObjectId
 
@@ -11,15 +11,16 @@ router = APIRouter(
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate, response: Response):
-    existing_user = await users_collection.find_one({"email": user.email})
+    existing_user = await User.find_one(User.username == user.username)
     if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(status_code=400, detail="Username already taken")
 
     user_dict = user.model_dump()
     user_dict["password"] = get_password_hash(user_dict["password"])
 
-    new_user = await users_collection.insert_one(user_dict)
-    user_id = str(new_user.inserted_id)
+    new_user = User(**user_dict)
+    await new_user.insert()
+    user_id = str(new_user.id)
 
     access_token = create_access_token(data={"sub": user_id})
 
@@ -31,18 +32,18 @@ async def register(user: UserCreate, response: Response):
         samesite="lax"
     )
 
-    return {"message": "Successfully registered", "user_id": user_id}
+    return {"user_id": user_id}
 
 @router.post("/login")
 async def login(user: UserLogin, response: Response):
-    db_user = await users_collection.find_one({"email": user.email})
+    db_user = await User.find_one(User.username == user.username)
     if not db_user:
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
 
-    if not verify_password(user.password, db_user["password"]):
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
+    if not verify_password(user.password, db_user.password):
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
 
-    user_id = str(db_user["_id"])
+    user_id = str(db_user.id)
     access_token = create_access_token(data={"sub": user_id})
 
     response.set_cookie(
@@ -53,9 +54,9 @@ async def login(user: UserLogin, response: Response):
         samesite="lax"
     )
 
-    return {"message": "Successfully logged in", "user_id": user_id}
+    return {"user_id": user_id}
 
 @router.post("/logout")
 async def logout(response: Response):
     response.delete_cookie("access_token")
-    return {"message": "Successfully logged out"}
+    return {"action": "logout"}

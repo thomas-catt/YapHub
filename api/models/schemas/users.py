@@ -1,11 +1,10 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+from pydantic import BaseModel, Field
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    username: str = Field(..., pattern=r"^[a-zA-Z0-9._-]+$")
     password: str
     display_name: str
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    username: str = Field(..., pattern=r"^[a-zA-Z0-9._-]+$")
     password: str

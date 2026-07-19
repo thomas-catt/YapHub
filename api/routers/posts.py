@@ -1,7 +1,7 @@
 from datetime import datetime
 from models.schemas.posts import PostCreate
 from fastapi import APIRouter, Depends
-from database import posts_collection
+from models.post import Post
 from utils.auth import get_current_user
 
 router = APIRouter(
@@ -37,22 +37,18 @@ async def get_all_posts():
         }
     ]
 
-    posts_cursor = posts_collection.aggregate(pipeline)
-    all_posts = await posts_cursor.to_list(length=100)
+    all_posts = await Post.aggregate(pipeline).to_list(length=100)
     
     for post in all_posts:
         post["_id"] = str(post["_id"])
         if "author" in post:
             post["author"]["_id"] = str(post["author"]["_id"])
         
-    return {"message": "Get all posts", "posts": all_posts}
+    return {"posts": all_posts}
 
 @router.post("/create")
 async def create_post(post: PostCreate, user_id: str = Depends(get_current_user)):
-    post_dict = post.model_dump()
+    new_post = Post(**post.model_dump(), author_id=user_id)
+    await new_post.insert()
     
-    post_dict["timestamp"] = datetime.now()
-    post_dict["author_id"] = user_id
-    
-    result = await posts_collection.insert_one(post_dict)
-    return {"message": "Post created", "post_id": str(result.inserted_id)}
+    return {"post_id": str(new_post.id)}

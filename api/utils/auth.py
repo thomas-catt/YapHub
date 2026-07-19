@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from fastapi import Request, HTTPException, status
 
-SECRET_KEY = os.getenv("JWT_SECRET", "super-secret-key-yaphub")
+SECRET_KEY = os.getenv("JWT_SECRET", "super-secret-key-yaphub-development-fallback-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
