@@ -6,8 +6,7 @@ from utils.auth import get_current_user
 
 router = APIRouter(
     prefix="/posts",
-    tags=["Posts"],
-    dependencies=[Depends(get_current_user)]
+    tags=["Posts"]
 )
 
 @router.get("/")
