@@ -26,6 +26,7 @@ nonisolated struct Post: Codable, Identifiable, Sendable {
     var likesCount: Int
     var commentsCount: Int
     let author: Author
+    var isLiked: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id = "_id"
@@ -37,6 +38,7 @@ nonisolated struct Post: Codable, Identifiable, Sendable {
         case likesCount = "likes_count"
         case commentsCount = "comments_count"
         case author
+        case isLiked = "is_liked"
     }
 }
 

@@ -4,7 +4,6 @@ struct CommentsView: View {
     @Bindable var viewModel: CommentsViewModel
     @Environment(AuthViewModel.self) private var authVM
 
-    @State private var showAddComment = false
     @State private var showLoginPrompt = false
 
     var body: some View {
@@ -14,7 +13,7 @@ struct CommentsView: View {
                 Section {
                     Button {
                         if authVM.isLoggedIn {
-                            showAddComment = true
+                            viewModel.isAddingComment = true
                         } else {
                             showLoginPrompt = true
                         }
@@ -63,19 +62,19 @@ struct CommentsView: View {
                         .padding(.vertical, YHSpacing.xxl)
                     }
                 } else {
-                    if viewModel.filterToCommentId != nil {
+                    if let filterIds = viewModel.filterToCommentIds {
                         Section {
                             Button {
                                 withAnimation {
-                                    viewModel.filterToCommentId = nil
+                                    viewModel.filterToCommentIds = nil
                                 }
                             } label: {
                                 HStack {
                                     Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                                    Text("Viewing one comment. See all comments...")
+                                    Text("Viewing \(filterIds.count) nearest comments. See all comments...")
                                         .font(YHFont.caption())
                                 }
-                                .foregroundStyle(Color.yhPrimary)
+                                .foregroundStyle(Color.yhTextSecondary)
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .padding(.vertical, YHSpacing.xs)
                             }
@@ -98,7 +97,7 @@ struct CommentsView: View {
             .listStyle(.plain)
             .navigationTitle("Comments")
             .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showAddComment) {
+            .sheet(isPresented: Bindable(viewModel).isAddingComment) {
                 AddCommentSheet(viewModel: viewModel)
             }
             .alert("Login Required", isPresented: $showLoginPrompt) {

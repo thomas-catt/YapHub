@@ -13,6 +13,7 @@ nonisolated struct Comment: Codable, Identifiable, Sendable {
     var likesCount: Int
     var repliesCount: Int
     let author: Author?
+    var isLiked: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id = "_id"
@@ -27,6 +28,7 @@ nonisolated struct Comment: Codable, Identifiable, Sendable {
         case likesCount = "likes_count"
         case repliesCount = "replies_count"
         case author
+        case isLiked = "is_liked"
     }
 }
 

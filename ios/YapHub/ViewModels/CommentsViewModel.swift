@@ -9,11 +9,11 @@ final class CommentsViewModel {
     var isLoading: Bool = false
     var errorMessage: String?
     var highlightedCommentId: String?
-    var filterToCommentId: String?
+    var filterToCommentIds: Set<String>?
 
     var displayComments: [Comment] {
-        if let filterId = filterToCommentId {
-            return comments.filter { $0.id == filterId }
+        if let filterIds = filterToCommentIds {
+            return comments.filter { filterIds.contains($0.id) }
         }
         return comments
     }
@@ -140,6 +140,27 @@ final class CommentsViewModel {
         repliesByCommentId[commentId] = currentReplies
         expandedReplies.insert(commentId)
         
+        // Optimistically increment ancestors
+        var currId: String? = commentId
+        while let id = currId {
+            var found = false
+            if let index = comments.firstIndex(where: { $0.id == id }) {
+                comments[index].repliesCount += 1
+                found = true
+                currId = nil
+            } else {
+                for (parentId, replies) in repliesByCommentId {
+                    if let index = replies.firstIndex(where: { $0.id == id }) {
+                        repliesByCommentId[parentId]?[index].repliesCount += 1
+                        currId = parentId
+                        found = true
+                        break
+                    }
+                }
+                if !found { currId = nil }
+            }
+        }
+        
         // Clear input early
         replyText = ""
         replyingToCommentId = nil
@@ -169,11 +190,13 @@ final class CommentsViewModel {
             let response = try await likeService.toggleLike(target: "comment", targetId: commentId)
             if let index = comments.firstIndex(where: { $0.id == commentId }) {
                 comments[index].likesCount = response.likesCount
+                comments[index].isLiked = response.action == "like"
             }
             // Also check replies
             for (parentId, replies) in repliesByCommentId {
                 if let index = replies.firstIndex(where: { $0.id == commentId }) {
                     repliesByCommentId[parentId]?[index].likesCount = response.likesCount
+                    repliesByCommentId[parentId]?[index].isLiked = response.action == "like"
                 }
             }
         } catch {

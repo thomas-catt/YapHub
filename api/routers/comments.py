@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from models.schemas.comments import CommentCreate, ReplyCreate
 from models.comment import Comment
 from models.post import Post
-from utils.auth import get_current_user
+from models.like import Like
+from utils.auth import get_current_user, get_optional_user
+from beanie.operators import In
 from bson.errors import InvalidId
 
 router = APIRouter(
@@ -70,7 +72,7 @@ async def create_comment(post_id: str, comment: CommentCreate, user_id: str = De
     return {"comment_id": str(new_comment.id)}
 
 @router.get("/posts/{post_id}/comments")
-async def get_post_comments(post_id: str, limit: int = 50, skip: int = 0):
+async def get_post_comments(post_id: str, limit: int = 50, skip: int = 0, user_id: str | None = Depends(get_optional_user)):
     pipeline = get_comments_pipeline({
         "post_id": post_id,
         "parent_reply_id": None
@@ -80,7 +82,20 @@ async def get_post_comments(post_id: str, limit: int = 50, skip: int = 0):
         {"$limit": limit}
     ])
     comments = await Comment.aggregate(pipeline).to_list(length=limit)
-    return format_comments(comments)
+    comments = format_comments(comments)
+    
+    if user_id and comments:
+        comment_ids = [c["_id"] for c in comments]
+        liked_comments = await Like.find(
+            Like.author_id == user_id,
+            Like.target == "comment",
+            In(Like.target_id, comment_ids)
+        ).to_list()
+        liked_ids = {l.target_id for l in liked_comments}
+        for c in comments:
+            c["is_liked"] = c["_id"] in liked_ids
+            
+    return comments
 
 @router.post("/comments/{comment_id}/replies", status_code=status.HTTP_201_CREATED)
 async def create_reply(comment_id: str, reply: ReplyCreate, user_id: str = Depends(get_current_user)):
@@ -101,8 +116,18 @@ async def create_reply(comment_id: str, reply: ReplyCreate, user_id: str = Depen
     )
     await new_reply.insert()
     
-    parent_comment.replies_count += 1
-    await parent_comment.save()
+    current_parent = parent_comment
+    while current_parent:
+        current_parent.replies_count += 1
+        await current_parent.save()
+        
+        if current_parent.parent_reply_id:
+            try:
+                current_parent = await Comment.get(current_parent.parent_reply_id)
+            except InvalidId:
+                break
+        else:
+            break
     
     post = await Post.get(parent_comment.post_id)
     if post:
@@ -112,7 +137,7 @@ async def create_reply(comment_id: str, reply: ReplyCreate, user_id: str = Depen
     return {"reply_id": str(new_reply.id)}
 
 @router.get("/comments/{comment_id}/replies")
-async def get_comment_replies(comment_id: str, limit: int = 50, skip: int = 0):
+async def get_comment_replies(comment_id: str, limit: int = 50, skip: int = 0, user_id: str | None = Depends(get_optional_user)):
     pipeline = get_comments_pipeline({
         "parent_reply_id": comment_id
     })
@@ -121,4 +146,17 @@ async def get_comment_replies(comment_id: str, limit: int = 50, skip: int = 0):
         {"$limit": limit}
     ])
     replies = await Comment.aggregate(pipeline).to_list(length=limit)
-    return format_comments(replies)
+    replies = format_comments(replies)
+    
+    if user_id and replies:
+        reply_ids = [r["_id"] for r in replies]
+        liked_replies = await Like.find(
+            Like.author_id == user_id,
+            Like.target == "comment",
+            In(Like.target_id, reply_ids)
+        ).to_list()
+        liked_ids = {l.target_id for l in liked_replies}
+        for r in replies:
+            r["is_liked"] = r["_id"] in liked_ids
+            
+    return replies

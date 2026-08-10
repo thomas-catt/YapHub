@@ -35,6 +35,23 @@ struct AddCommentSheet: View {
                                             viewModel.selectedPoint = clamped
                                             isTextFieldFocused = true
                                         }
+
+                                    // Show existing comments
+                                    ForEach(Array(viewModel.comments.enumerated()).reversed(), id: \.element.id) { index, comment in
+                                        if let x = comment.xCoordinate, let y = comment.yCoordinate {
+                                            Circle()
+                                                .fill(Color.commentDotColors[index % Color.commentDotColors.count].opacity(0.6))
+                                                .frame(width: 14, height: 14)
+                                                .overlay(
+                                                    Circle().stroke(.white.opacity(0.6), lineWidth: 1.5)
+                                                )
+                                                .position(
+                                                    x: (x / 100.0) * imgGeo.size.width,
+                                                    y: (y / 100.0) * imgGeo.size.height
+                                                )
+                                                .allowsHitTesting(false)
+                                        }
+                                    }
                                     
                                     // Show placed pin
                                     if let point = tappedPoint {
@@ -139,6 +156,12 @@ struct AddCommentSheet: View {
                         dismiss()
                     }
                     .foregroundStyle(Color.yhTextSecondary)
+                }
+            }
+            .onAppear {
+                if let point = viewModel.selectedPoint {
+                    tappedPoint = point
+                    isTextFieldFocused = true
                 }
             }
         }

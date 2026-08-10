@@ -100,12 +100,13 @@ struct CommentRowView: View {
                     }
                 } label: {
                     HStack(spacing: 3) {
-                        Image(systemName: "heart")
+                        Image(systemName: comment.isLiked == true ? "heart.fill" : "heart")
                             .font(.system(size: 13))
+                            .foregroundStyle(comment.isLiked == true ? Color.yhLikeActive : Color.yhTextTertiary)
                         Text("\(comment.likesCount)")
                             .font(YHFont.small())
+                            .foregroundStyle(comment.isLiked == true ? Color.yhLikeActive : Color.yhTextTertiary)
                     }
-                    .foregroundStyle(comment.likesCount > 0 ? Color.yhLikeActive : Color.yhTextTertiary)
                 }
                 .buttonStyle(.borderless)
 

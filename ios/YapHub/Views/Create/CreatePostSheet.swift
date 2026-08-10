@@ -51,27 +51,32 @@ struct CreatePostSheet: View {
 
                     // Image preview
                     if !viewModel.imageURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        AsyncImage(url: URL(string: viewModel.imageURL)) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(maxHeight: 250)
-                                    .clipShape(RoundedRectangle(cornerRadius: YHRadius.md))
-                                    .shadow(color: .black.opacity(0.1), radius: 8)
-                            case .failure:
-                                imageErrorView
-                            case .empty:
-                                ProgressView()
-                                    .frame(height: 150)
-                            @unknown default:
-                                EmptyView()
+                        if let url = previewURL {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(maxHeight: 250)
+                                        .clipShape(RoundedRectangle(cornerRadius: YHRadius.md))
+                                        .shadow(color: .black.opacity(0.1), radius: 8)
+                                case .failure:
+                                    imageErrorView
+                                case .empty:
+                                    ProgressView()
+                                        .frame(height: 150)
+                                @unknown default:
+                                    EmptyView()
+                                }
                             }
+                            .padding(.horizontal, YHSpacing.lg)
+                            .transition(.opacity)
+                            .animation(.easeInOut, value: viewModel.imageURL)
+                        } else {
+                            invalidURLPlaceholder
+                                .padding(.horizontal, YHSpacing.lg)
                         }
-                        .padding(.horizontal, YHSpacing.lg)
-                        .transition(.opacity)
-                        .animation(.easeInOut, value: viewModel.imageURL)
                     }
 
                     // Caption input
@@ -150,5 +155,30 @@ struct CreatePostSheet: View {
         .background(Color.yhSurface)
         .clipShape(RoundedRectangle(cornerRadius: YHRadius.md))
         .padding(.horizontal, YHSpacing.lg)
+    }
+
+    private var invalidURLPlaceholder: some View {
+        VStack(spacing: YHSpacing.sm) {
+            Image(systemName: "link")
+                .font(.system(size: 24))
+                .foregroundStyle(Color.yhTextTertiary)
+            Text("Enter a valid HTTP/HTTPS URL")
+                .font(YHFont.caption())
+                .foregroundStyle(Color.yhTextTertiary)
+        }
+        .frame(height: 120)
+        .frame(maxWidth: .infinity)
+        .background(Color.yhSurface)
+        .clipShape(RoundedRectangle(cornerRadius: YHRadius.md))
+    }
+
+    private var previewURL: URL? {
+        let trimmed = viewModel.imageURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed),
+              let scheme = url.scheme, ["http", "https"].contains(scheme.lowercased()),
+              let host = url.host, !host.isEmpty else {
+            return nil
+        }
+        return url
     }
 }

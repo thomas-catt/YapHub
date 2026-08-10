@@ -6,6 +6,8 @@ struct PostCardView: View {
 
     @State private var showComments = false
     @State private var commentsVM: CommentsViewModel?
+    @Environment(AuthViewModel.self) private var authVM
+    @State private var showLoginPrompt = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -29,6 +31,11 @@ struct PostCardView: View {
             if let vm = commentsVM {
                 CommentsView(viewModel: vm)
             }
+        }
+        .alert("Login Required", isPresented: $showLoginPrompt) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Please log in from the Account tab to add a comment.")
         }
     }
 
@@ -88,12 +95,28 @@ struct PostCardView: View {
         }
         .overlay {
             GeometryReader { geometry in
-                CommentDotsOverlay(postId: post.id, size: geometry.size) { commentId in
+                CommentDotsOverlay(postId: post.id, size: geometry.size) { commentId, nearestIds in
                     let vm = CommentsViewModel(post: post)
                     vm.highlightedCommentId = commentId
-                    vm.filterToCommentId = commentId
+                    vm.filterToCommentIds = nearestIds
                     commentsVM = vm
                     showComments = true
+                } onEmptyTapped: { location in
+                    if authVM.isLoggedIn {
+                        let vm = CommentsViewModel(post: post)
+                        let xPercent = (location.x / geometry.size.width) * 100.0
+                        let yPercent = (location.y / geometry.size.height) * 100.0
+                        let clamped = CGPoint(
+                            x: min(max(xPercent, 0), 100),
+                            y: min(max(yPercent, 0), 100)
+                        )
+                        vm.selectedPoint = clamped
+                        vm.isAddingComment = true
+                        commentsVM = vm
+                        showComments = true
+                    } else {
+                        showLoginPrompt = true
+                    }
                 }
             }
         }
@@ -112,7 +135,7 @@ struct PostCardView: View {
                 HStack(spacing: YHSpacing.xs) {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 20))
-                        .foregroundStyle(post.likesCount > 0 ? Color.yhLikeActive : Color.yhTextTertiary)
+                        .foregroundStyle(post.isLiked == true ? Color.yhLikeActive : Color.yhTextTertiary)
                     Text("\(post.likesCount)")
                         .font(YHFont.caption())
                         .foregroundStyle(Color.yhTextSecondary)
@@ -198,29 +221,82 @@ struct PostCardView: View {
 struct CommentDotsOverlay: View {
     let postId: String
     let size: CGSize
-    var onDotTapped: ((String) -> Void)?
+    var onDotTapped: ((String, Set<String>) -> Void)?
+    var onEmptyTapped: ((CGPoint) -> Void)?
 
     @State private var comments: [Comment] = []
     @State private var isPulsing = false
+    @State private var tappedLocation: CGPoint? = nil
 
     var body: some View {
         ZStack {
-            ForEach(Array(comments.enumerated()), id: \.element.id) { index, comment in
-                if let x = comment.xCoordinate, let y = comment.yCoordinate {
-                    Button {
-                        onDotTapped?(comment.id)
-                    } label: {
-                        Circle()
-                            .fill(dotColor(for: index))
-                            .frame(width: 14, height: 14)
-                            .overlay(
-                                Circle()
-                                    .stroke(.white, lineWidth: 1.5)
-                            )
-                            .shadow(color: dotColor(for: index).opacity(0.5), radius: 4)
-                            .scaleEffect(isPulsing ? 1.1 : 0.9)
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { location in
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        tappedLocation = location
                     }
-                    .buttonStyle(.plain)
+                }
+
+            if let loc = tappedLocation {
+                VStack(spacing: 0) {
+                    Text("Add comment here")
+                        .font(YHFont.caption())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule().fill(Color(white: 0.15))
+                        )
+                        .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+                        .onTapGesture {
+                            onEmptyTapped?(loc)
+                            tappedLocation = nil
+                        }
+                    
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: 0))
+                        path.addLine(to: CGPoint(x: 12, y: 0))
+                        path.addLine(to: CGPoint(x: 6, y: 6))
+                        path.closeSubpath()
+                    }
+                    .fill(Color(white: 0.15))
+                    .frame(width: 12, height: 6)
+                }
+                .position(x: loc.x, y: loc.y - 25)
+                .transition(.opacity)
+                .zIndex(100)
+            }
+
+            ForEach(Array(comments.enumerated()).reversed(), id: \.element.id) { index, comment in
+                if let x = comment.xCoordinate, let y = comment.yCoordinate {
+                    Circle()
+                        .fill(dotColor(for: index))
+                        .frame(width: 14, height: 14)
+                        .overlay(
+                            Circle()
+                                .stroke(.white, lineWidth: 1.5)
+                        )
+                        .shadow(color: dotColor(for: index).opacity(0.5), radius: 4)
+                        .scaleEffect(isPulsing ? 1.1 : 0.9)
+                        .frame(width: 44, height: 44) // Increase touch target
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(
+                            TapGesture().onEnded {
+                                var nearestIds = Set<String>()
+                                for other in comments {
+                                    if let ox = other.xCoordinate, let oy = other.yCoordinate {
+                                        let dx = ox - x
+                                        let dy = oy - y
+                                        let distance = sqrt(dx*dx + dy*dy)
+                                        if distance <= 4.0 {
+                                            nearestIds.insert(other.id)
+                                        }
+                                    }
+                                }
+                                onDotTapped?(comment.id, nearestIds)
+                            }
+                        )
                     .position(
                         x: (x / 100.0) * size.width,
                         y: (y / 100.0) * size.height

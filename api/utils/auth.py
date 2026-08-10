@@ -45,3 +45,17 @@ async def get_current_user(request: Request) -> str:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
     except InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+async def get_optional_user(request: Request) -> str | None:
+    token = request.cookies.get("access_token")
+    if not token:
+        return None
+    
+    if token.startswith("Bearer "):
+        token = token[7:]
+        
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload.get("sub")
+    except Exception:
+        return None

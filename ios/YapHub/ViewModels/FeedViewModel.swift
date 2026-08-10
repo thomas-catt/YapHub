@@ -34,6 +34,7 @@ final class FeedViewModel {
             let response = try await likeService.toggleLike(target: "post", targetId: postId)
             if let index = posts.firstIndex(where: { $0.id == postId }) {
                 posts[index].likesCount = response.likesCount
+                posts[index].isLiked = response.action == "like"
             }
         } catch {
             // Silently fail on like toggle errors
