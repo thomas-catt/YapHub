@@ -20,6 +20,11 @@ struct CommentRowView: View {
         viewModel.replyingToCommentId == comment.id
     }
 
+    private var dotColor: Color {
+        let index = viewModel.comments.firstIndex(where: { $0.id == comment.id }) ?? 0
+        return Color.commentDotColors[index % Color.commentDotColors.count]
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Main comment content
@@ -30,8 +35,8 @@ struct CommentRowView: View {
                 replyInputField
             }
 
-            // Replies section (top-level comments only)
-            if isTopLevel && comment.repliesCount > 0 {
+            // Replies section
+            if comment.repliesCount > 0 {
                 repliesSection
             }
         }
@@ -47,10 +52,16 @@ struct CommentRowView: View {
                     .font(.system(size: 24))
                     .foregroundStyle(Color.yhSecondary.opacity(0.7))
 
-                Text("User")
+                Text(comment.author?.displayName ?? "User")
                     .font(YHFont.caption())
                     .bold()
                     .foregroundStyle(Color.yhTextPrimary)
+
+                if let username = comment.author?.username {
+                    Text("@\(username)")
+                        .font(YHFont.small())
+                        .foregroundStyle(Color.yhTextTertiary)
+                }
 
                 Text(relativeTime(from: comment.createdAt))
                     .font(YHFont.small())
@@ -65,7 +76,7 @@ struct CommentRowView: View {
                     } label: {
                         Image(systemName: "mappin.circle.fill")
                             .font(.system(size: 18))
-                            .foregroundStyle(Color.yhAccent)
+                            .foregroundStyle(dotColor)
                     }
                     .buttonStyle(.borderless)
                     .sheet(isPresented: $showImageSpot) {
@@ -215,18 +226,17 @@ struct CommentRowView: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .overlay {
                                 GeometryReader { imgGeo in
                                     if let x = comment.xCoordinate, let y = comment.yCoordinate {
                                         Circle()
-                                            .fill(Color.yhPrimary)
+                                            .fill(dotColor)
                                             .frame(width: 20, height: 20)
                                             .overlay(
                                                 Circle()
                                                     .stroke(.white, lineWidth: 2)
                                             )
-                                            .shadow(color: Color.yhPrimary.opacity(0.6), radius: 8)
+                                            .shadow(color: dotColor.opacity(0.6), radius: 8)
                                             .position(
                                                 x: (x / 100.0) * imgGeo.size.width,
                                                 y: (y / 100.0) * imgGeo.size.height
@@ -234,6 +244,7 @@ struct CommentRowView: View {
                                     }
                                 }
                             }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     default:
                         ProgressView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)

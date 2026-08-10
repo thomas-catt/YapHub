@@ -7,8 +7,44 @@ from bson.errors import InvalidId
 
 router = APIRouter(
     tags=["Comments"],
-    dependencies=[Depends(get_current_user)]
 )
+
+def get_comments_pipeline(match_stage: dict) -> list:
+    return [
+        {"$match": match_stage},
+        {
+            "$addFields": {
+                "author_id_obj": { "$toObjectId": "$author_id" }
+            }
+        },
+        {
+            "$lookup": {
+                "from": "users",
+                "localField": "author_id_obj",
+                "foreignField": "_id",
+                "as": "author"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$author",
+                "preserveNullAndEmptyArrays": True
+            }
+        },
+        {
+            "$project": {
+                "author_id_obj": 0,
+                "author.password": 0 
+            }
+        }
+    ]
+
+def format_comments(comments_list: list) -> list:
+    for comment in comments_list:
+        comment["_id"] = str(comment["_id"])
+        if "author" in comment and comment["author"]:
+            comment["author"]["_id"] = str(comment["author"]["_id"])
+    return comments_list
 
 @router.post("/posts/{post_id}/comments", status_code=status.HTTP_201_CREATED)
 async def create_comment(post_id: str, comment: CommentCreate, user_id: str = Depends(get_current_user)):
@@ -35,12 +71,16 @@ async def create_comment(post_id: str, comment: CommentCreate, user_id: str = De
 
 @router.get("/posts/{post_id}/comments")
 async def get_post_comments(post_id: str, limit: int = 50, skip: int = 0):
-    # Fetch only top-level comments for the post (parent_reply_id == None)
-    comments = await Comment.find(
-        Comment.post_id == post_id, 
-        Comment.parent_reply_id == None
-    ).skip(skip).limit(limit).to_list()
-    return comments
+    pipeline = get_comments_pipeline({
+        "post_id": post_id,
+        "parent_reply_id": None
+    })
+    pipeline.extend([
+        {"$skip": skip},
+        {"$limit": limit}
+    ])
+    comments = await Comment.aggregate(pipeline).to_list(length=limit)
+    return format_comments(comments)
 
 @router.post("/comments/{comment_id}/replies", status_code=status.HTTP_201_CREATED)
 async def create_reply(comment_id: str, reply: ReplyCreate, user_id: str = Depends(get_current_user)):
@@ -73,7 +113,12 @@ async def create_reply(comment_id: str, reply: ReplyCreate, user_id: str = Depen
 
 @router.get("/comments/{comment_id}/replies")
 async def get_comment_replies(comment_id: str, limit: int = 50, skip: int = 0):
-    replies = await Comment.find(
-        Comment.parent_reply_id == comment_id
-    ).skip(skip).limit(limit).to_list()
-    return replies
+    pipeline = get_comments_pipeline({
+        "parent_reply_id": comment_id
+    })
+    pipeline.extend([
+        {"$skip": skip},
+        {"$limit": limit}
+    ])
+    replies = await Comment.aggregate(pipeline).to_list(length=limit)
+    return format_comments(replies)

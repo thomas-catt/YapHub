@@ -9,6 +9,14 @@ final class CommentsViewModel {
     var isLoading: Bool = false
     var errorMessage: String?
     var highlightedCommentId: String?
+    var filterToCommentId: String?
+
+    var displayComments: [Comment] {
+        if let filterId = filterToCommentId {
+            return comments.filter { $0.id == filterId }
+        }
+        return comments
+    }
 
     // For inline reply
     var replyingToCommentId: String?
@@ -109,17 +117,46 @@ final class CommentsViewModel {
 
         isSubmittingReply = true
 
+        let optimisticText = replyText
+        let optimisticId = UUID().uuidString
+        let optimisticComment = Comment(
+            id: optimisticId,
+            authorId: "temp",
+            postId: post.id,
+            parentReplyId: commentId,
+            content: optimisticText,
+            xCoordinate: nil,
+            yCoordinate: nil,
+            createdAt: ISO8601DateFormatter().string(from: Date()),
+            updatedAt: ISO8601DateFormatter().string(from: Date()),
+            likesCount: 0,
+            repliesCount: 0,
+            author: Author(id: "temp", username: "sending...", displayName: "Sending...")
+        )
+
+        // Optimistically add to replies
+        var currentReplies = repliesByCommentId[commentId] ?? []
+        currentReplies.append(optimisticComment)
+        repliesByCommentId[commentId] = currentReplies
+        expandedReplies.insert(commentId)
+        
+        // Clear input early
+        replyText = ""
+        replyingToCommentId = nil
+
         do {
             _ = try await commentService.createReply(
                 commentId: commentId,
-                content: replyText
+                content: optimisticText
             )
-            replyText = ""
-            replyingToCommentId = nil
-            // Refresh replies for the parent comment
+            // Refresh replies to get the real comment with correct ID and author
             await loadReplies(for: commentId)
         } catch {
             errorMessage = "Failed to post reply"
+            // Revert optimistic update
+            var revertedReplies = repliesByCommentId[commentId] ?? []
+            revertedReplies.removeAll(where: { $0.id == optimisticId })
+            repliesByCommentId[commentId] = revertedReplies
         }
 
         isSubmittingReply = false

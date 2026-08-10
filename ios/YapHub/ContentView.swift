@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AuthViewModel.self) private var authVM
     @State private var selectedTab: Tab = .home
+    @State private var previousTab: Tab = .home
     @State private var showCreateSheet = false
     @State private var feedVM = FeedViewModel()
     @State private var createPostVM = CreatePostViewModel()
@@ -36,15 +37,20 @@ struct ContentView: View {
         }
         .tint(Color.yhPrimary)
         .onChange(of: selectedTab) { oldValue, newValue in
-            if newValue == .create {
+            if newValue != .create {
+                previousTab = newValue
+            } else {
                 if authVM.isLoggedIn {
                     showCreateSheet = true
-                    // Revert to previous tab so the "create" tab doesn't show blank underneath
-                    selectedTab = oldValue
                 } else {
                     // Redirect directly to account tab to show login
                     selectedTab = .account
                 }
+            }
+        }
+        .onChange(of: showCreateSheet) { _, isPresented in
+            if !isPresented && selectedTab == .create {
+                selectedTab = previousTab
             }
         }
         .sheet(isPresented: $showCreateSheet) {

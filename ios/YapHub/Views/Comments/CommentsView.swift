@@ -63,8 +63,27 @@ struct CommentsView: View {
                         .padding(.vertical, YHSpacing.xxl)
                     }
                 } else {
+                    if viewModel.filterToCommentId != nil {
+                        Section {
+                            Button {
+                                withAnimation {
+                                    viewModel.filterToCommentId = nil
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                                    Text("Viewing one comment. See all comments...")
+                                        .font(YHFont.caption())
+                                }
+                                .foregroundStyle(Color.yhPrimary)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, YHSpacing.xs)
+                            }
+                        }
+                    }
+
                     Section {
-                        ForEach(viewModel.comments) { comment in
+                        ForEach(viewModel.displayComments) { comment in
                             CommentRowView(
                                 comment: comment,
                                 viewModel: viewModel,

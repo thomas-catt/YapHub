@@ -12,6 +12,7 @@ nonisolated struct Comment: Codable, Identifiable, Sendable {
     let updatedAt: String
     var likesCount: Int
     var repliesCount: Int
+    let author: Author?
 
     enum CodingKeys: String, CodingKey {
         case id = "_id"
@@ -25,6 +26,7 @@ nonisolated struct Comment: Codable, Identifiable, Sendable {
         case updatedAt = "updated_at"
         case likesCount = "likes_count"
         case repliesCount = "replies_count"
+        case author
     }
 }
 

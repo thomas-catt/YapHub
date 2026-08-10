@@ -88,10 +88,10 @@ struct PostCardView: View {
         }
         .overlay {
             GeometryReader { geometry in
-                // Comment dot overlays (loaded asynchronously)
                 CommentDotsOverlay(postId: post.id, size: geometry.size) { commentId in
                     let vm = CommentsViewModel(post: post)
                     vm.highlightedCommentId = commentId
+                    vm.filterToCommentId = commentId
                     commentsVM = vm
                     showComments = true
                 }
